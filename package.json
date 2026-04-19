@@ -1,0 +1,35 @@
+{
+  "name": "routine-tracker",
+  "version": "1.0.0",
+  "description": "OBS overlay controller for dance competition routines",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --publish=never"
+  },
+  "build": {
+    "appId": "com.routinetracker.app",
+    "productName": "Routine Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "css/**/*",
+      "js/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "artifactName": "Routine-Tracker-${version}-${arch}.dmg"
+    }
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
