@@ -11,7 +11,7 @@ const API_URL = '/api/state';
 //     "downloadUrl": "https://.../Routine-Tracker-1.1.0-arm64.dmg",
 //     "downloadUrlX64": "https://.../Routine-Tracker-1.1.0-x64.dmg",
 //     "releaseNotes": "Fixed X, added Y" }
-const UPDATE_MANIFEST_URL = '';
+const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/conquerdesigngroup/routine-tracker/main/update-manifest.json';
 const AUTO_CHECK_KEY = 'auto-check-updates';
 const LAST_CHECK_KEY  = 'update-last-check';
 
