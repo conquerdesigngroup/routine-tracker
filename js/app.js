@@ -299,11 +299,16 @@ function setCurrentDropIn(number, title) {
 
 // ========= RENDERING =========
 function renderOverlay() {
-  const card = document.getElementById('overlay-card');
-  if (!state.current || !state.current.number) { card.style.display = 'none'; return; }
-  card.style.display = 'block';
-  document.getElementById('ov-number').textContent = state.current.number;
-  document.getElementById('ov-title').textContent = state.current.title || '';
+  const el = document.getElementById('ov-text');
+  if (!el) return;
+  if (!state.current || !state.current.number) {
+    el.textContent = '';
+    el.style.visibility = 'hidden';
+    return;
+  }
+  el.style.visibility = 'visible';
+  const title = state.current.title || '';
+  el.textContent = title ? `${state.current.number} - ${title}` : state.current.number;
 }
 
 function renderController() {

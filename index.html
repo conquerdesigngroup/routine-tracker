@@ -15,11 +15,7 @@
 
 <!-- OVERLAY (what OBS displays) -->
 <div class="overlay">
-  <div class="overlay-card" id="overlay-card">
-    <div class="overlay-label">Routine</div>
-    <div class="overlay-number" id="ov-number">—</div>
-    <div class="overlay-title" id="ov-title"></div>
-  </div>
+  <div class="ov-text" id="ov-text"></div>
 </div>
 
 <!-- CONTROLLER -->
@@ -61,16 +57,15 @@
   </div>
   <div class="shortcut">← Previous &nbsp;•&nbsp; → / Space: Next &nbsp;•&nbsp; Esc: Hide &nbsp;•&nbsp; 0-9: Keypad &nbsp;•&nbsp; Enter: Show</div>
 
-  <!-- Routine list (primary interaction) -->
-  <div class="card full-row">
-    <h2>Routines (<span id="count">0</span>) — click to show</h2>
-    <div class="routine-list" id="routine-list">
-      <div class="empty">No routines loaded yet.<br>Paste your list below to get started.</div>
+  <!-- Routines list (left) + Keypad (right) -->
+  <div class="tools-row main-grid">
+    <div class="card">
+      <h2>Routines (<span id="count">0</span>) — click to show</h2>
+      <div class="routine-list" id="routine-list">
+        <div class="empty">No routines loaded yet.<br>Paste your list below to get started.</div>
+      </div>
     </div>
-  </div>
 
-  <!-- Quick tools: keypad + drop-in -->
-  <div class="tools-row">
     <div class="card">
       <h2>🔢 Quick Number (Keypad)</h2>
       <div class="keypad-display empty" id="kp-display">Type a number…</div>
@@ -95,7 +90,10 @@
       </div>
       <div class="hint">If the number matches a loaded routine, its title shows too. Otherwise just the number appears.</div>
     </div>
+  </div>
 
+  <!-- Drop-in routine (secondary tool) -->
+  <div class="tools-row">
     <div class="card">
       <h2>➕ Drop-in Routine</h2>
       <label class="label">Routine Number</label>
@@ -108,12 +106,10 @@
       </div>
       <div class="hint"><b>Show Now</b> displays without saving. <b>Add to List</b> inserts it into your routine list in numerical order (e.g. 3.5 slots between 3 and 4).</div>
     </div>
-  </div>
 
-  <!-- Paste input (setup) -->
-  <div class="card full-row">
-    <h2>Paste Routine List</h2>
-    <textarea id="routine-input" placeholder="Paste your routines here, one per line:
+    <div class="card">
+      <h2>Paste Routine List</h2>
+      <textarea id="routine-input" placeholder="Paste your routines here, one per line:
 
 1. Opening Number
 2 - Sparkle Toes - Mini Jazz
@@ -121,13 +117,14 @@
 4	Thunder	Teen Hip Hop
 
 (Number first, then title.)"></textarea>
-    <div class="btn-row">
-      <button id="parse-btn" class="primary">Load Routines</button>
-      <button id="pdf-btn">📄 Upload PDF</button>
-      <button id="sample-btn">Sample</button>
-      <button id="clear-all-btn" class="ghost">Clear All</button>
+      <div class="btn-row">
+        <button id="parse-btn" class="primary">Load Routines</button>
+        <button id="pdf-btn">📄 Upload PDF</button>
+        <button id="sample-btn">Sample</button>
+        <button id="clear-all-btn" class="ghost">Clear All</button>
+      </div>
+      <input type="file" id="pdf-input" accept="application/pdf" style="display:none">
     </div>
-    <input type="file" id="pdf-input" accept="application/pdf" style="display:none">
   </div>
 
   <footer class="app-footer">
