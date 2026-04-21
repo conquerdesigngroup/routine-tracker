@@ -18,6 +18,8 @@
   <div class="ov-text" id="ov-text"></div>
 </div>
 
+<div class="drop-zone-hint" id="drop-zone-hint">Drop PDF to load routines</div>
+
 <!-- CONTROLLER -->
 <div class="controller">
   <div class="brand"><span class="brand-1">routine</span><span class="brand-slash"></span><span class="brand-2">tracker</span></div>
@@ -46,8 +48,14 @@
     <div class="left">
       <div class="label">On Stream</div>
       <div class="num" id="cs-number">—</div>
+      <div class="cs-timer" id="cs-timer"></div>
     </div>
     <div class="title" id="cs-title">Nothing showing</div>
+    <div class="next-up" id="next-up" style="display:none">
+      <div class="label">Next Up</div>
+      <div class="next-num" id="nu-number">—</div>
+      <div class="next-title" id="nu-title"></div>
+    </div>
   </div>
 
   <div class="nav-row">
@@ -60,7 +68,17 @@
   <!-- Routines list (left) + Keypad (right) -->
   <div class="tools-row main-grid">
     <div class="card">
-      <h2>Routines (<span id="count">0</span>) — click to show</h2>
+      <div class="card-header-row">
+        <h2>Routines (<span id="count">0</span>) — click to show</h2>
+        <button id="reset-progress-btn" class="ghost header-btn" style="display:none" title="Un-mark every routine as shown">Reset Progress</button>
+        <button id="recover-btn" class="ghost header-btn recover-btn" style="display:none" title="Restore the last list you cleared">↺ Recover Cleared</button>
+        <button id="clear-list-btn" class="ghost header-btn">Clear All</button>
+      </div>
+      <div class="routine-filter-row" id="routine-filter-row" style="display:none">
+        <input type="text" id="routine-filter" placeholder="Filter by number or title…" autocomplete="off">
+        <button id="routine-filter-clear" class="ghost" title="Clear filter">✕</button>
+        <button id="hide-shown-toggle" class="ghost" title="Hide routines already shown">Hide Shown</button>
+      </div>
       <div class="routine-list" id="routine-list">
         <div class="empty">No routines loaded yet.<br>Paste your list below to get started.</div>
       </div>

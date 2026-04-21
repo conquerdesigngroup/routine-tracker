@@ -19,7 +19,8 @@ let currentVersion = '';
 let updateInfo = null;
 
 // state.current = null OR { number, title, fromIndex: number|null, isDropIn: bool }
-let state = { routines: [], current: null };
+// state.hidden = true means overlay is blanked but the current position is kept
+let state = { routines: [], current: null, hidden: false, clearedBackup: null };
 let serverMode = false;   // true = sync via server API (Electron); false = localStorage only
 let lastServerJSON = '';  // last JSON we've seen from server, for change detection
 
@@ -30,6 +31,26 @@ async function detectServerMode() {
       serverMode = true;
       const data = await resp.json();
       applyRemoteState(data);
+      // Recovery: if the server lost its state but localStorage still has
+      // routines (e.g. migrating from the file:// version, or state.json was
+      // reset), restore from local and push back to the server.
+      if (!data.routines || data.routines.length === 0) {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.routines) && parsed.routines.length > 0) {
+              state = {
+                routines: parsed.routines,
+                current: parsed.current ?? null,
+                hidden: !!parsed.hidden,
+                clearedBackup: parsed.clearedBackup || null
+              };
+              saveState();
+            }
+          }
+        } catch (_) {}
+      }
       return;
     }
   } catch (_) {}
@@ -40,7 +61,9 @@ async function detectServerMode() {
 function applyRemoteState(data) {
   state = {
     routines: Array.isArray(data.routines) ? data.routines : [],
-    current: data.current ?? null
+    current: data.current ?? null,
+    hidden: !!data.hidden,
+    clearedBackup: data.clearedBackup || null
   };
   lastServerJSON = JSON.stringify(state);
 }
@@ -52,7 +75,9 @@ function loadLocalState() {
       const parsed = JSON.parse(raw);
       state = {
         routines: Array.isArray(parsed.routines) ? parsed.routines : [],
-        current: parsed.current ?? null
+        current: parsed.current ?? null,
+        hidden: !!parsed.hidden,
+        clearedBackup: parsed.clearedBackup || null
       };
       return;
     }
@@ -220,25 +245,58 @@ function cleanTitle(raw) {
   // Strip common dance age-group + level suffix (e.g. "Junior Starter", "Teen Competitive")
   const ageRx = /\s+(Petite|Mini|Junior|Teen|Senior|Adult|Pre-?Teen|Pre-?Competitive)\s+(Starter|Beginner|Intermediate|Advanced|Competitive|Elite|Recreational|Performance|Showcase)\s*$/i;
   t = t.replace(ageRx, '').trim();
-  // Strip trailing style suffix (e.g. "Jazz Solo", "Tap Duo/Trio")
-  const styleRx = /\s+(Jazz|Tap|Ballet|Lyrical|Modern|Lyrical\/Modern|Contemporary|Hip Hop|Hip-Hop|Open|Musical Theater|Acro|Pointe|Clogging|Song and Dance|Production)\s+(Solo|Duet|Duo|Trio|Duo\/Trio|Duet\/Trio|Small Group|Large Group|Line|Extended Line|Production)\s*$/i;
+  // Strip trailing style suffix (e.g. "Jazz Solo", "Tap Duo/Trio", "Jazz Small Groups")
+  const styleRx = /\s+(Jazz|Tap|Ballet|Lyrical|Modern|Lyrical\/Modern|Contemporary|Hip Hop|Hip-Hop|Open|Musical Theater|Acro|Pointe|Clogging|Song and Dance|Production)\s+(Solo|Duet|Duo|Trio|Duo\/Trio|Duet\/Trio|Small Groups?|Large Groups?|Line|Extended Line|Production)\s*$/i;
   t = t.replace(styleRx, '').trim();
   return t;
+}
+
+// Titles that look truncated (end with a preposition/article/conjunction) likely wrapped
+// to the next PDF line.
+const TITLE_LOOKS_WRAPPED = /\b(a|an|the|in|on|at|of|to|for|by|from|with|about|over|under|through|and|or|but|as|like|into|onto|your|my|this|that|these|those|against|without)$/i;
+
+// Dance styles — used to detect where the "style line" is within the next few rows.
+const STYLE_KW_RX = /(Jazz|Tap|Ballet|Lyrical(?:\/Modern)?|Modern|Contemporary|Hip[-\s]?Hop|Open|Musical Theater|Acro|Pointe|Clogging|Song and Dance|Production)\b/i;
+
+// Given the rows that follow a wrapped routine line, locate the style line and
+// return any non-style prefix on that line (the real title continuation).
+// Example: "Heavens Lyrical/Modern Small" → "Heavens"
+//          "Jazz Small Groups"            → ''
+function extractTitleContinuation(followingLines) {
+  for (const line of followingLines) {
+    if (!line) continue;
+    // If a dancer list (has a comma) shows up before a style line, bail.
+    if (line.includes(',')) return '';
+    // Line starts with a style keyword → no continuation, this is just the style line.
+    if (new RegExp('^\\s*' + STYLE_KW_RX.source, 'i').test(line)) return '';
+    // Line has a style keyword mid-line — the prefix is the continuation.
+    const m = line.match(new RegExp('^(.+?)\\s+' + STYLE_KW_RX.source, 'i'));
+    if (m) return m[1].trim();
+  }
+  return '';
 }
 
 function extractRoutinesFromLines(lines) {
   const routines = [];
   let lastNum = 0;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const m = line.match(/^(\d{1,4})\s+(.{2,}?)$/);
     if (!m) continue;
     const num = parseInt(m[1], 10);
     // Accept any strictly increasing number — handles skipped numbers (e.g. 181 → 183)
     // while rejecting re-scans of already-seen routines
     if (num <= lastNum) continue;
-    const title = cleanTitle(m[2]);
+    let title = cleanTitle(m[2]);
     if (!title) continue;
     if (/^(name|age|show order|letter|group|style)/i.test(title)) continue;
+
+    // Stitch wrapped titles by scanning the next few rows for the style line
+    if (TITLE_LOOKS_WRAPPED.test(title)) {
+      const cont = extractTitleContinuation(lines.slice(i + 1, i + 7));
+      if (cont) title = (title + ' ' + cont).trim();
+    }
+
     routines.push({ number: String(num), title });
     lastNum = num;
   }
@@ -284,24 +342,31 @@ function insertRoutineSorted(routine) {
 function setCurrentFromIndex(i) {
   if (i < 0 || i >= state.routines.length) { state.current = null; return; }
   const r = state.routines[i];
-  state.current = { number: r.number, title: r.title, fromIndex: i, isDropIn: false };
+  r.shown = true;
+  const keepStart = state.current && state.current.fromIndex === i && state.current.startedAt
+    ? state.current.startedAt
+    : Date.now();
+  state.current = { number: r.number, title: r.title, fromIndex: i, isDropIn: false, startedAt: keepStart };
+  state.hidden = false;
 }
 
 function setCurrentFromNumber(number) {
   const idx = findRoutineIndex(number);
   if (idx >= 0) setCurrentFromIndex(idx);
-  else state.current = { number: number, title: '', fromIndex: null, isDropIn: false };
+  else state.current = { number: number, title: '', fromIndex: null, isDropIn: false, startedAt: Date.now() };
+  state.hidden = false;
 }
 
 function setCurrentDropIn(number, title) {
-  state.current = { number, title: title || '', fromIndex: null, isDropIn: true };
+  state.current = { number, title: title || '', fromIndex: null, isDropIn: true, startedAt: Date.now() };
+  state.hidden = false;
 }
 
 // ========= RENDERING =========
 function renderOverlay() {
   const el = document.getElementById('ov-text');
   if (!el) return;
-  if (!state.current || !state.current.number) {
+  if (state.hidden || !state.current || !state.current.number) {
     el.textContent = '';
     el.style.visibility = 'hidden';
     return;
@@ -323,18 +388,86 @@ function renderController() {
   } else {
     csNumber.textContent = state.current.number;
     const titleText = state.current.title || '(no title)';
-    const badge = state.current.isDropIn ? ' <span class="badge">Drop-in</span>' :
+    const hiddenBadge = state.hidden ? ' <span class="badge badge-hidden">Hidden</span>' : '';
+    const kindBadge = state.current.isDropIn ? ' <span class="badge">Drop-in</span>' :
                   (state.current.fromIndex === null ? ' <span class="badge">Manual</span>' : '');
-    csTitle.innerHTML = escapeHTML(titleText) + badge;
+    csTitle.innerHTML = escapeHTML(titleText) + hiddenBadge + kindBadge;
+  }
+
+  const hideBtn = document.getElementById('clear-btn');
+  if (hideBtn) {
+    hideBtn.textContent = state.hidden ? 'Show Overlay' : 'Hide Overlay';
+    hideBtn.classList.toggle('hidden-active', !!state.hidden);
+  }
+
+  updateElapsedTimer();
+
+  // Next Up: shown only when the current routine came from the list and has a successor
+  const nextUp = document.getElementById('next-up');
+  if (nextUp) {
+    const idx = state.current ? state.current.fromIndex : null;
+    const next = idx !== null && idx >= 0 && idx < state.routines.length - 1
+      ? state.routines[idx + 1]
+      : null;
+    if (next) {
+      nextUp.style.display = 'flex';
+      document.getElementById('nu-number').textContent = next.number;
+      document.getElementById('nu-title').textContent = next.title || '(no title)';
+    } else {
+      nextUp.style.display = 'none';
+    }
+  }
+
+  // Reset Progress button only appears once at least one routine is marked shown
+  const resetBtn = document.getElementById('reset-progress-btn');
+  if (resetBtn) {
+    const anyShown = state.routines.some(r => r.shown);
+    resetBtn.style.display = anyShown ? '' : 'none';
+  }
+
+  // Recover Cleared: shown only when a backup exists from a prior Clear All
+  const recoverBtn = document.getElementById('recover-btn');
+  if (recoverBtn) {
+    const b = state.clearedBackup;
+    if (b && Array.isArray(b.routines) && b.routines.length > 0) {
+      recoverBtn.style.display = '';
+      const when = b.at ? new Date(b.at).toLocaleString() : '';
+      recoverBtn.title = `Restore ${b.routines.length} routine${b.routines.length === 1 ? '' : 's'} cleared${when ? ' at ' + when : ''}`;
+    } else {
+      recoverBtn.style.display = 'none';
+    }
   }
 
   const activeIdx = state.current ? state.current.fromIndex : null;
 
+  const filterRow = document.getElementById('routine-filter-row');
+  if (filterRow) filterRow.style.display = state.routines.length > 0 ? 'flex' : 'none';
+
   if (state.routines.length === 0) {
     list.innerHTML = '<div class="empty">No routines loaded yet.<br>Paste your list on the right →</div>';
   } else {
-    list.innerHTML = state.routines.map((r, i) => `
-      <div class="routine-item ${i === activeIdx ? 'active' : ''}" data-idx="${i}">
+    const q = routineFilter.trim().toLowerCase();
+    const visible = state.routines
+      .map((r, i) => ({ r, i }))
+      .filter(({ r, i }) => {
+        if (hideShown && r.shown && i !== activeIdx) return false;
+        if (!q) return true;
+        return String(r.number).toLowerCase().includes(q) || String(r.title).toLowerCase().includes(q);
+      });
+
+    if (visible.length === 0) {
+      const emptyMsg = q
+        ? `No routines match "${escapeHTML(routineFilter)}".`
+        : 'All routines marked shown. Toggle off "Hide Shown" to see them.';
+      list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+      updateKeypadMatch();
+      return;
+    }
+
+    const previewIdx = keypadValue ? state.routines.findIndex(r => String(r.number).toLowerCase().startsWith(keypadValue.toLowerCase())) : -1;
+
+    list.innerHTML = visible.map(({ r, i }) => `
+      <div class="routine-item ${i === activeIdx ? 'active' : ''} ${r.shown ? 'shown' : ''} ${i === previewIdx ? 'preview' : ''}" data-idx="${i}">
         <div class="r-num">${escapeHTML(r.number)}</div>
         <div class="r-title">${escapeHTML(r.title)}${r.addedLive ? '<span class="tag-dropin">added</span>' : ''}</div>
         <button class="r-del" data-del="${i}" title="Remove">✕</button>
@@ -361,14 +494,14 @@ function renderController() {
       });
     });
 
-    const active = list.querySelector('.routine-item.active');
-    if (active) {
+    const scrollTarget = list.querySelector('.routine-item.preview') || list.querySelector('.routine-item.active');
+    if (scrollTarget) {
       const listRect = list.getBoundingClientRect();
-      const itemRect = active.getBoundingClientRect();
+      const itemRect = scrollTarget.getBoundingClientRect();
       if (itemRect.top < listRect.top) {
-        list.scrollTop += itemRect.top - listRect.top;
+        list.scrollTop += itemRect.top - listRect.top - 8;
       } else if (itemRect.bottom > listRect.bottom) {
-        list.scrollTop += itemRect.bottom - listRect.bottom;
+        list.scrollTop += itemRect.bottom - listRect.bottom + 8;
       }
     }
   }
@@ -381,8 +514,32 @@ function render() {
   else renderController();
 }
 
+function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => n.toString().padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+function updateElapsedTimer() {
+  const t = document.getElementById('cs-timer');
+  if (!t) return;
+  if (!state.current || !state.current.startedAt) {
+    t.textContent = '';
+    t.classList.remove('timer-dim');
+    return;
+  }
+  t.textContent = '⏱ ' + formatElapsed(Date.now() - state.current.startedAt);
+  t.classList.toggle('timer-dim', !!state.hidden);
+}
+
 // ========= KEYPAD =========
 let keypadValue = '';
+let routineFilter = '';
+const HIDE_SHOWN_KEY = 'rt-hide-shown-v1';
+let hideShown = localStorage.getItem(HIDE_SHOWN_KEY) === 'true';
 
 function updateKeypadDisplay() {
   const disp = document.getElementById('kp-display');
@@ -394,7 +551,8 @@ function updateKeypadDisplay() {
     disp.textContent = keypadValue;
     disp.classList.remove('empty');
   }
-  updateKeypadMatch();
+  if (!isOverlay) renderController();
+  else updateKeypadMatch();
 }
 
 function updateKeypadMatch() {
@@ -486,15 +644,65 @@ if (!isOverlay) {
 7. Closing Number`;
   });
 
-  document.getElementById('clear-all-btn').addEventListener('click', () => {
+  function clearAllRoutines() {
     if (!confirm('Clear all routines?')) return;
-    state = { routines: [], current: null };
-    document.getElementById('routine-input').value = '';
+    const backup = state.routines.length > 0
+      ? { routines: state.routines, at: new Date().toISOString() }
+      : (state.clearedBackup || null);
+    state = { routines: [], current: null, hidden: false, clearedBackup: backup };
+    const input = document.getElementById('routine-input');
+    if (input) input.value = '';
     saveState();
     render();
-  });
+  }
+  document.getElementById('clear-all-btn').addEventListener('click', clearAllRoutines);
+  const headerClear = document.getElementById('clear-list-btn');
+  if (headerClear) headerClear.addEventListener('click', clearAllRoutines);
 
-  // PDF upload
+  const resetProgressBtn = document.getElementById('reset-progress-btn');
+  if (resetProgressBtn) {
+    resetProgressBtn.addEventListener('click', () => {
+      state.routines.forEach(r => { delete r.shown; });
+      saveState();
+      render();
+    });
+  }
+
+  const recoverBtn = document.getElementById('recover-btn');
+  if (recoverBtn) {
+    recoverBtn.addEventListener('click', () => {
+      if (!state.clearedBackup || !Array.isArray(state.clearedBackup.routines) || state.clearedBackup.routines.length === 0) return;
+      if (state.routines.length > 0 && !confirm('This will replace the current routine list with the last cleared list. Continue?')) return;
+      state.routines = state.clearedBackup.routines;
+      state.current = null;
+      state.clearedBackup = null;
+      saveState();
+      render();
+    });
+  }
+
+  // PDF upload — shared handler used by button + drag-and-drop
+  async function handlePDFFile(file) {
+    if (!window.pdfjsLib) { alert('PDF library not loaded. Check your internet connection.'); return; }
+    const btn = document.getElementById('pdf-btn');
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = 'Parsing…'; btn.disabled = true; }
+    try {
+      const routines = await parsePDF(file);
+      if (routines.length === 0) {
+        alert('No routines found. The PDF may not have numbered entries, or the format is different than expected.');
+      } else {
+        document.getElementById('routine-input').value =
+          routines.map(r => `${r.number}. ${r.title}`).join('\n');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to read PDF: ' + err.message);
+    } finally {
+      if (btn) { btn.textContent = label; btn.disabled = false; }
+    }
+  }
+
   document.getElementById('pdf-btn').addEventListener('click', () => {
     if (!window.pdfjsLib) { alert('PDF library not loaded. Check your internet connection.'); return; }
     document.getElementById('pdf-input').click();
@@ -502,30 +710,39 @@ if (!isOverlay) {
   document.getElementById('pdf-input').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const btn = document.getElementById('pdf-btn');
-    const label = btn.textContent;
-    btn.textContent = 'Parsing…';
-    btn.disabled = true;
-    try {
-      const routines = await parsePDF(file);
-      if (routines.length === 0) {
-        alert('No routines found. The PDF may not have numbered entries, or the format is different than expected.');
-      } else {
-        state.routines = routines;
-        state.current = null;
-        document.getElementById('routine-input').value =
-          routines.map(r => `${r.number}. ${r.title}`).join('\n');
-        saveState();
-        render();
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Failed to read PDF: ' + err.message);
-    } finally {
-      btn.textContent = label;
-      btn.disabled = false;
-      e.target.value = '';
+    await handlePDFFile(file);
+    e.target.value = '';
+  });
+
+  // Drag-and-drop PDF anywhere on the window
+  let dragDepth = 0;
+  const isFileDrag = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  document.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    document.body.classList.add('drag-active');
+  });
+  document.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+  });
+  document.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) document.body.classList.remove('drag-active');
+  });
+  document.addEventListener('drop', async (e) => {
+    if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('drag-active');
+    const file = e.dataTransfer.files[0];
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      alert('Drop a PDF file to load routines.');
+      return;
     }
+    await handlePDFFile(file);
   });
 
   // Navigation
@@ -548,7 +765,12 @@ if (!isOverlay) {
   });
 
   document.getElementById('clear-btn').addEventListener('click', () => {
-    state.current = null;
+    if (state.current) {
+      // Toggle: hide overlay but keep position so Next/Prev resume from here
+      state.hidden = !state.hidden;
+    } else {
+      state.hidden = false;
+    }
     saveState();
     render();
   });
@@ -594,6 +816,57 @@ if (!isOverlay) {
   });
 
   updateKeypadDisplay();
+
+  const filterInput = document.getElementById('routine-filter');
+  const filterClear = document.getElementById('routine-filter-clear');
+  if (filterInput) {
+    filterInput.addEventListener('input', () => {
+      routineFilter = filterInput.value;
+      renderController();
+    });
+  }
+  if (filterClear) {
+    filterClear.addEventListener('click', () => {
+      routineFilter = '';
+      if (filterInput) filterInput.value = '';
+      renderController();
+      filterInput && filterInput.focus();
+    });
+  }
+
+  const hideShownBtn = document.getElementById('hide-shown-toggle');
+  if (hideShownBtn) {
+    const syncHideShownBtn = () => {
+      hideShownBtn.classList.toggle('toggle-active', hideShown);
+      hideShownBtn.textContent = hideShown ? '✓ Hiding Shown' : 'Hide Shown';
+    };
+    syncHideShownBtn();
+    hideShownBtn.addEventListener('click', () => {
+      hideShown = !hideShown;
+      try { localStorage.setItem(HIDE_SHOWN_KEY, String(hideShown)); } catch (_) {}
+      syncHideShownBtn();
+      renderController();
+    });
+  }
+
+  setInterval(updateElapsedTimer, 1000);
+
+  const routineCard = document.querySelector('.tools-row.main-grid > .card:first-child');
+  const routineList = document.getElementById('routine-list');
+  const keypadCard = document.querySelector('.tools-row.main-grid > .card:nth-child(2)');
+  if (routineCard && routineList && keypadCard && window.ResizeObserver) {
+    const sync = () => {
+      const siblingH = keypadCard.offsetHeight;
+      const listTop = routineList.getBoundingClientRect().top - routineCard.getBoundingClientRect().top;
+      const cardStyle = getComputedStyle(routineCard);
+      const bottomPad = parseFloat(cardStyle.paddingBottom) + parseFloat(cardStyle.borderBottomWidth);
+      const h = Math.max(120, siblingH - listTop - bottomPad);
+      routineList.style.height = h + 'px';
+      routineList.style.maxHeight = h + 'px';
+    };
+    new ResizeObserver(sync).observe(keypadCard);
+    sync();
+  }
 }
 
 // Boot sequence: detect server, then render; start polling if server mode

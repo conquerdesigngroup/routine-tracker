@@ -6,7 +6,7 @@ const path = require('path');
 const PREFERRED_PORT = 7423;
 let activePort = PREFERRED_PORT;
 
-let state = { routines: [], current: null };
+let state = { routines: [], current: null, hidden: false, clearedBackup: null };
 let stateFile;
 
 function loadPersistedState() {
@@ -14,6 +14,7 @@ function loadPersistedState() {
     const raw = fs.readFileSync(stateFile, 'utf8');
     state = JSON.parse(raw);
     if (!state.routines) state.routines = [];
+    if (!('clearedBackup' in state)) state.clearedBackup = null;
   } catch (_) {}
 }
 
@@ -77,7 +78,12 @@ function createServer() {
         try {
           const next = JSON.parse(body);
           if (typeof next !== 'object' || !next) throw new Error('bad payload');
-          state = { routines: next.routines || [], current: next.current ?? null };
+          state = {
+            routines: next.routines || [],
+            current: next.current ?? null,
+            hidden: !!next.hidden,
+            clearedBackup: next.clearedBackup ?? null
+          };
           savePersistedState();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end('{"ok":true}');
