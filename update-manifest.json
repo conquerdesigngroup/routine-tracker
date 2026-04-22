@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
-  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.1/Routine-Tracker-1.1.1-arm64.dmg",
-  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.1/Routine-Tracker-1.1.1-x64.dmg",
-  "releaseNotes": "New glass-RT app icon. All v1.1.0 features included: filter + search routines, auto-mark shown, Next Up preview, elapsed timer, Recover Cleared, drag-and-drop PDF, bigger/bolder list text."
+  "version": "1.1.2",
+  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.2/Routine-Tracker-1.1.2-arm64.dmg",
+  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.2/Routine-Tracker-1.1.2-x64.dmg",
+  "releaseNotes": "Glass-RT logo now shows at the top of the controller next to the wordmark, with a transparent edge so the tile floats on the dark background."
 }

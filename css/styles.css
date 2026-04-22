@@ -112,6 +112,22 @@ h1 {
   letter-spacing: -0.5px;
 }
 
+/* Top banner: app icon + wordmark */
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 1.2vw, 18px);
+  width: 100%;
+  margin: 8px auto 10px;
+}
+.brand-icon {
+  height: clamp(52px, 7.2vw, 88px);
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
+}
+
 /* New Balance-inspired wordmark */
 .brand {
   font-family: 'Poppins', sans-serif;
@@ -121,14 +137,13 @@ h1 {
   font-size: clamp(32px, 5.5vw, 64px);
   line-height: 1;
   letter-spacing: -0.02em;
-  margin: 8px auto 10px;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.25em;
   color: var(--white);
   transform: skewX(-6deg);
-  width: 100%;
   text-align: center;
 }
 .brand .brand-1 { color: var(--white); }
