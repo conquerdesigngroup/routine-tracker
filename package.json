@@ -1,6 +1,6 @@
 {
   "name": "routine-tracker",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "OBS overlay controller for dance competition routines",
   "main": "main.js",
   "scripts": {
@@ -23,6 +23,7 @@
     "mac": {
       "category": "public.app-category.productivity",
       "identity": null,
+      "icon": "build/icon.icns",
       "target": [
         { "target": "dmg", "arch": ["arm64", "x64"] }
       ],
