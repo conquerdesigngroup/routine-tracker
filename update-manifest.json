@@ -2,5 +2,5 @@
   "version": "1.1.2",
   "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.2/Routine-Tracker-1.1.2-arm64.dmg",
   "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.1.2/Routine-Tracker-1.1.2-x64.dmg",
-  "releaseNotes": "Glass-RT logo now shows at the top of the controller next to the wordmark, with a transparent edge so the tile floats on the dark background."
+  "releaseNotes": "New glass-RT logo at the top of the controller. If macOS says the app is \"damaged\" on first launch, see the release page — one Terminal command fixes it."
 }
