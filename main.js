@@ -6,7 +6,7 @@ const path = require('path');
 const PREFERRED_PORT = 7423;
 let activePort = PREFERRED_PORT;
 
-let state = { routines: [], current: null, hidden: false, clearedBackup: null };
+let state = { routines: [], current: null, hidden: false, clearedBackup: null, message: { text: '', visible: false } };
 let stateFile;
 
 function loadPersistedState() {
@@ -15,6 +15,7 @@ function loadPersistedState() {
     state = JSON.parse(raw);
     if (!state.routines) state.routines = [];
     if (!('clearedBackup' in state)) state.clearedBackup = null;
+    if (!state.message || typeof state.message !== 'object') state.message = { text: '', visible: false };
   } catch (_) {}
 }
 
@@ -78,11 +79,15 @@ function createServer() {
         try {
           const next = JSON.parse(body);
           if (typeof next !== 'object' || !next) throw new Error('bad payload');
+          const nextMsg = (next.message && typeof next.message === 'object') ? next.message : null;
           state = {
             routines: next.routines || [],
             current: next.current ?? null,
             hidden: !!next.hidden,
-            clearedBackup: next.clearedBackup ?? null
+            clearedBackup: next.clearedBackup ?? null,
+            message: nextMsg
+              ? { text: typeof nextMsg.text === 'string' ? nextMsg.text : '', visible: !!nextMsg.visible }
+              : { text: '', visible: false }
           };
           savePersistedState();
           res.writeHead(200, { 'Content-Type': 'application/json' });

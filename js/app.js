@@ -1,5 +1,11 @@
 const isOverlay = window.location.hash === '#overlay';
-document.body.className = isOverlay ? 'overlay-mode' : 'controller-mode';
+const isMessagesOverlay = window.location.hash === '#messages';
+const isAnyOverlay = isOverlay || isMessagesOverlay;
+document.body.className = isOverlay
+  ? 'overlay-mode'
+  : isMessagesOverlay
+    ? 'messages-mode'
+    : 'controller-mode';
 
 const STORAGE_KEY = 'obs-routines-state-v2';
 const OLD_STORAGE_KEY = 'obs-routines-state-v1';
@@ -20,7 +26,13 @@ let updateInfo = null;
 
 // state.current = null OR { number, title, fromIndex: number|null, isDropIn: bool }
 // state.hidden = true means overlay is blanked but the current position is kept
-let state = { routines: [], current: null, hidden: false, clearedBackup: null };
+let state = {
+  routines: [],
+  current: null,
+  hidden: false,
+  clearedBackup: null,
+  message: { text: '', visible: false }
+};
 let serverMode = false;   // true = sync via server API (Electron); false = localStorage only
 let lastServerJSON = '';  // last JSON we've seen from server, for change detection
 
@@ -63,9 +75,15 @@ function applyRemoteState(data) {
     routines: Array.isArray(data.routines) ? data.routines : [],
     current: data.current ?? null,
     hidden: !!data.hidden,
-    clearedBackup: data.clearedBackup || null
+    clearedBackup: data.clearedBackup || null,
+    message: normalizeMessage(data.message)
   };
   lastServerJSON = JSON.stringify(state);
+}
+
+function normalizeMessage(m) {
+  if (!m || typeof m !== 'object') return { text: '', visible: false };
+  return { text: typeof m.text === 'string' ? m.text : '', visible: !!m.visible };
 }
 
 function loadLocalState() {
@@ -77,7 +95,8 @@ function loadLocalState() {
         routines: Array.isArray(parsed.routines) ? parsed.routines : [],
         current: parsed.current ?? null,
         hidden: !!parsed.hidden,
-        clearedBackup: parsed.clearedBackup || null
+        clearedBackup: parsed.clearedBackup || null,
+        message: normalizeMessage(parsed.message)
       };
       return;
     }
@@ -511,7 +530,42 @@ function renderController() {
 
 function render() {
   if (isOverlay) renderOverlay();
+  else if (isMessagesOverlay) renderMessagesOverlay();
   else renderController();
+}
+
+function renderMessagesOverlay() {
+  const track = document.getElementById('msg-ticker');
+  if (!track) return;
+  const msg = state.message || { text: '', visible: false };
+  const shouldShow = msg.visible && msg.text && msg.text.trim().length > 0;
+
+  if (!shouldShow) {
+    track.textContent = '';
+    track.classList.remove('scrolling');
+    track.style.visibility = 'hidden';
+    return;
+  }
+
+  track.style.visibility = 'visible';
+  // Only reset animation when the text actually changes, so in-flight scrolls
+  // aren't restarted on unrelated state polls.
+  if (track.textContent !== msg.text) {
+    track.textContent = msg.text;
+    // Force layout so offsetWidth is accurate, then pick a duration that keeps
+    // scroll speed constant regardless of message length.
+    void track.offsetWidth;
+    const SPEED_PX_PER_SEC = 150;
+    const totalDistance = window.innerWidth + track.offsetWidth;
+    const duration = Math.max(8, totalDistance / SPEED_PX_PER_SEC);
+    track.style.setProperty('--ticker-duration', duration + 's');
+    // Restart animation from the right
+    track.classList.remove('scrolling');
+    void track.offsetWidth;
+    track.classList.add('scrolling');
+  } else if (!track.classList.contains('scrolling')) {
+    track.classList.add('scrolling');
+  }
 }
 
 function formatElapsed(ms) {
@@ -783,6 +837,31 @@ if (!isOverlay) {
   document.getElementById('kp-clear').addEventListener('click', keypadClear);
   document.getElementById('kp-show').addEventListener('click', keypadShow);
 
+  // Message overlay
+  const msgInput = document.getElementById('msg-input');
+  const msgShowBtn = document.getElementById('msg-show');
+  const msgHideBtn = document.getElementById('msg-hide');
+  if (msgInput && state.message && state.message.text) msgInput.value = state.message.text;
+  if (msgShowBtn && msgInput) {
+    msgShowBtn.addEventListener('click', () => {
+      const text = msgInput.value.trim();
+      if (!text) { alert('Enter a message first.'); msgInput.focus(); return; }
+      state.message = { text, visible: true };
+      saveState();
+      render();
+    });
+    msgInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') msgShowBtn.click();
+    });
+  }
+  if (msgHideBtn) {
+    msgHideBtn.addEventListener('click', () => {
+      state.message = { text: (state.message && state.message.text) || '', visible: false };
+      saveState();
+      render();
+    });
+  }
+
   // Drop-in
   document.getElementById('di-show').addEventListener('click', dropInShow);
   document.getElementById('di-add').addEventListener('click', dropInAdd);
@@ -896,14 +975,20 @@ if (!isOverlay) {
       const banner = document.getElementById('obs-url-banner');
       if (banner) {
         banner.style.display = 'flex';
-        const url = `${location.origin}/#overlay`;
-        banner.querySelector('.obs-url-value').textContent = url;
-        banner.querySelector('.obs-url-copy').addEventListener('click', async () => {
-          try { await navigator.clipboard.writeText(url); } catch (_) {}
-          const btn = banner.querySelector('.obs-url-copy');
-          const prev = btn.textContent;
-          btn.textContent = 'Copied ✓';
-          setTimeout(() => { btn.textContent = prev; }, 1400);
+        const urls = {
+          overlay: `${location.origin}/#overlay`,
+          messages: `${location.origin}/#messages`
+        };
+        banner.querySelector('[data-kind="overlay"]').textContent = urls.overlay;
+        banner.querySelector('[data-kind="messages"]').textContent = urls.messages;
+        banner.querySelectorAll('.obs-url-copy').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const kind = btn.dataset.copy || 'overlay';
+            try { await navigator.clipboard.writeText(urls[kind]); } catch (_) {}
+            const prev = btn.textContent;
+            btn.textContent = 'Copied ✓';
+            setTimeout(() => { btn.textContent = prev; }, 1400);
+          });
         });
       }
     }
@@ -923,8 +1008,8 @@ if (!isOverlay) {
   }
 
   if (serverMode) {
-    setInterval(pollServerState, isOverlay ? 400 : 1000);
-  } else if (isOverlay) {
-    setInterval(() => { loadLocalState(); renderOverlay(); }, 500);
+    setInterval(pollServerState, isAnyOverlay ? 400 : 1000);
+  } else if (isAnyOverlay) {
+    setInterval(() => { loadLocalState(); render(); }, 500);
   }
 })();

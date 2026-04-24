@@ -19,6 +19,13 @@
   <div class="ov-text" id="ov-text"></div>
 </div>
 
+<!-- MESSAGES OVERLAY (separate OBS browser source) -->
+<div class="messages">
+  <div class="ticker">
+    <div class="ticker-track" id="msg-ticker"></div>
+  </div>
+</div>
+
 <div class="drop-zone-hint" id="drop-zone-hint">Drop PDF to load routines</div>
 
 <!-- CONTROLLER -->
@@ -39,13 +46,20 @@
   </div>
 
   <div class="obs-url-banner" id="obs-url-banner" style="display:none">
-    <div class="obs-url-label">OBS Browser Source URL</div>
-    <code class="obs-url-value">—</code>
-    <button class="obs-url-copy">Copy</button>
+    <div class="obs-url-row">
+      <div class="obs-url-label">Routines</div>
+      <code class="obs-url-value" data-kind="overlay">—</code>
+      <button class="obs-url-copy" data-copy="overlay">Copy</button>
+    </div>
+    <div class="obs-url-row">
+      <div class="obs-url-label">Messages</div>
+      <code class="obs-url-value" data-kind="messages">—</code>
+      <button class="obs-url-copy" data-copy="messages">Copy</button>
+    </div>
   </div>
 
   <div class="instructions">
-    <b>OBS setup:</b> Add a <b>Browser Source</b> → URL = full path to this file ending in <code>#overlay</code> (e.g. <code>file:///Users/you/routine-overlay.html#overlay</code>). Width 1920, height 1080, transparent. Open the same file <i>without</i> <code>#overlay</code> (or add it as a Custom Browser Dock inside OBS) — that's your controller.
+    <b>OBS setup:</b> Add <b>two</b> Browser Sources — one ending in <code>#overlay</code> for the routine number/title, and one ending in <code>#messages</code> for the scrolling-text ticker. Width 1920, height 1080, transparent. Open the same file <i>without</i> a hash (or add it as a Custom Browser Dock) — that's your controller.
   </div>
 
   <div class="now-showing">
@@ -111,6 +125,20 @@
         <button id="kp-show" class="primary" style="flex:2">Show on Stream</button>
       </div>
       <div class="hint">If the number matches a loaded routine, its title shows too. Otherwise just the number appears.</div>
+    </div>
+  </div>
+
+  <!-- Message overlay control (ticker on the #messages OBS source) -->
+  <div class="tools-row message-row">
+    <div class="card">
+      <h2>📣 Message Overlay (scrolling ticker)</h2>
+      <label class="label">Message</label>
+      <input type="text" id="msg-input" placeholder="e.g. Intermission — back in 10 minutes" autocomplete="off">
+      <div class="btn-row">
+        <button id="msg-show" class="primary" style="flex:2">Show on Stream</button>
+        <button id="msg-hide" class="ghost">Hide Message</button>
+      </div>
+      <div class="hint">Scrolls right-to-left across the bottom of the <b>Messages</b> overlay — add a second OBS Browser Source pointed at the <code>#messages</code> URL above. Short sentences read best.</div>
     </div>
   </div>
 

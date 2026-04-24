@@ -39,8 +39,15 @@ body {
 
 /* ===== OVERLAY MODE (what OBS shows) ===== */
 body.overlay-mode { background: transparent; }
-body.overlay-mode .controller { display: none; }
+body.overlay-mode .controller,
+body.overlay-mode .messages { display: none; }
 body.overlay-mode .overlay { display: flex; }
+
+/* ===== MESSAGES OVERLAY MODE (second OBS browser source) ===== */
+body.messages-mode { background: transparent; }
+body.messages-mode .controller,
+body.messages-mode .overlay { display: none; }
+body.messages-mode .messages { display: flex; }
 
 /* ===== CONTROLLER MODE ===== */
 body.controller-mode {
@@ -74,7 +81,8 @@ body.controller-mode::before {
   z-index: 0;
 }
 body.controller-mode .controller { display: block; position: relative; z-index: 1; }
-body.controller-mode .overlay { display: none; }
+body.controller-mode .overlay,
+body.controller-mode .messages { display: none; }
 
 /* ===== OBS Overlay ===== */
 .overlay {
@@ -96,6 +104,45 @@ body.controller-mode .overlay { display: none; }
   text-shadow:
     0 2px 4px rgba(0,0,0,0.55),
     0 4px 10px rgba(0,0,0,0.35);
+}
+
+/* ===== Messages overlay (bottom-center scrolling ticker) ===== */
+.messages {
+  display: none;
+  align-items: flex-end;
+  justify-content: stretch;
+  min-height: 100vh;
+  padding: 0 0 50px 0;
+}
+.ticker {
+  width: 100%;
+  overflow: hidden;
+  height: 110px;
+  display: flex;
+  align-items: center;
+}
+.ticker-track {
+  display: inline-block;
+  white-space: nowrap;
+  font-family: 'Avega', 'Poppins', sans-serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 72px;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  text-shadow:
+    0 2px 4px rgba(0,0,0,0.6),
+    0 4px 12px rgba(0,0,0,0.4);
+  transform: translateX(100vw);
+  will-change: transform;
+}
+.ticker-track.scrolling {
+  animation: ticker-scroll var(--ticker-duration, 25s) linear infinite;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(100vw); }
+  to   { transform: translateX(-100%); }
 }
 
 /* ===== Controller ===== */
@@ -299,14 +346,20 @@ h1 {
 
 .obs-url-banner {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
   background: linear-gradient(180deg, #0e1013 0%, #07080a 100%);
   border: 1px solid rgba(213,255,64,0.3);
   border-radius: 10px;
   padding: 10px 14px;
   margin-bottom: 14px;
   box-shadow: 0 0 24px rgba(213,255,64,0.08);
+}
+.obs-url-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 .obs-url-label {
   font-size: 10px;
@@ -610,6 +663,9 @@ button.hidden-active:active {
 @media (max-width: 820px) { .tools-row { grid-template-columns: 1fr; } }
 
 .full-row { margin-bottom: 18px; }
+
+/* Message overlay card is a full-width single column */
+.tools-row.message-row { grid-template-columns: 1fr; }
 
 /* Routines list (wider) + Keypad (narrower) side-by-side. */
 .tools-row.main-grid {
