@@ -127,8 +127,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1240,
     height: 960,
-    minWidth: 900,
-    minHeight: 700,
+    minWidth: 380,
+    minHeight: 520,
     title: 'Routine Tracker',
     backgroundColor: '#0a0a0c',
     titleBarStyle: 'hiddenInset',

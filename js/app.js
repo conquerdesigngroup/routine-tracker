@@ -856,15 +856,28 @@ if (!isOverlay) {
   const keypadCard = document.querySelector('.tools-row.main-grid > .card:nth-child(2)');
   if (routineCard && routineList && keypadCard && window.ResizeObserver) {
     const sync = () => {
+      // When the cards stack vertically (narrow / phone layout), let the CSS
+      // rules govern the list height instead of pinning to the keypad.
+      const rc = routineCard.getBoundingClientRect();
+      const kc = keypadCard.getBoundingClientRect();
+      const stacked = kc.top >= rc.bottom - 1;
+      if (stacked) {
+        routineList.style.height = '';
+        routineList.style.maxHeight = '';
+        return;
+      }
       const siblingH = keypadCard.offsetHeight;
-      const listTop = routineList.getBoundingClientRect().top - routineCard.getBoundingClientRect().top;
+      const listTop = routineList.getBoundingClientRect().top - rc.top;
       const cardStyle = getComputedStyle(routineCard);
       const bottomPad = parseFloat(cardStyle.paddingBottom) + parseFloat(cardStyle.borderBottomWidth);
       const h = Math.max(120, siblingH - listTop - bottomPad);
       routineList.style.height = h + 'px';
       routineList.style.maxHeight = h + 'px';
     };
-    new ResizeObserver(sync).observe(keypadCard);
+    const ro = new ResizeObserver(sync);
+    ro.observe(keypadCard);
+    ro.observe(routineCard);          // stacked/unstacked can flip when the card reflows
+    window.addEventListener('resize', sync);
     sync();
   }
 }

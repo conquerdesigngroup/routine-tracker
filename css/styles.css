@@ -997,3 +997,149 @@ body.drag-active .drop-zone-hint { display: flex; }
   font-weight: 500;
   letter-spacing: 0.5px;
 }
+
+/* =========================================================================
+   Responsive — tablet & phone layouts
+   Desktop stays 2-col; <760px collapses to a single column with tightened
+   spacing; <480px goes full phone-compact.
+   ========================================================================= */
+
+/* Tablet / narrow window — single column */
+@media (max-width: 760px) {
+  body.controller-mode {
+    padding: 34px 14px 20px;
+  }
+  .controller { max-width: 100%; }
+
+  .brand { font-size: clamp(28px, 8vw, 48px); }
+  .brand-icon { height: clamp(44px, 10vw, 64px); }
+  .sub { font-size: 13px; margin-bottom: 14px; }
+  .instructions { padding: 12px 14px; font-size: 12px; line-height: 1.5; }
+
+  /* Now-showing wraps: left block + title stay on row 1, Next Up drops below */
+  .now-showing {
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    padding: 18px 20px;
+  }
+  .now-showing .left { min-width: auto; }
+  .now-showing .num { font-size: 52px; }
+  .now-showing .title { flex: 1 1 160px; font-size: 16px; }
+  .now-showing .next-up {
+    flex: 1 1 100%;
+    border-left: none;
+    padding-left: 0;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    max-width: none;
+  }
+
+  .nav-row button { padding: 13px 8px; font-size: 12px; letter-spacing: 0.5px; }
+
+  /* Main grid collapses — already covered by existing 860px rule, but we
+     tighten spacing here for phone-like widths. */
+  .tools-row, .tools-row.main-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .tools-row.main-grid .routine-list {
+    max-height: min(48vh, 420px) !important;
+    height: auto !important;
+  }
+
+  .card { padding: 16px; }
+  .card h2 { font-size: 9.5px; letter-spacing: 1.5px; }
+
+  .routine-item { padding: 12px 14px; gap: 12px; }
+  .routine-item .r-num { font-size: 18px; min-width: 42px; }
+  .routine-item.active .r-num { font-size: 20px; }
+  .routine-item .r-title { font-size: 15.5px; }
+
+  /* Filter row: input + clear (X) share row 1; Hide Shown drops to row 2 */
+  .routine-filter-row { flex-wrap: wrap; gap: 6px; }
+  .routine-filter-row input { flex: 1 1 120px; min-width: 0; }
+  .routine-filter-row #routine-filter-clear { flex: 0 0 auto; order: 1; }
+  .routine-filter-row #hide-shown-toggle { flex: 1 1 100%; order: 2; }
+
+  /* Keypad */
+  .keypad-display { font-size: 28px; padding: 14px; }
+  .kp-btn { padding: 16px 0; font-size: 20px; }
+
+  .obs-url-banner { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .obs-url-label { flex: 1 0 100%; }
+  .obs-url-value { flex: 1 1 100%; font-size: 11.5px; word-break: break-all; }
+  .obs-url-copy { flex: 0 0 auto; }
+
+  .update-banner { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+  .update-banner .up-icon { font-size: 22px; }
+  .update-banner .up-text { flex: 1 1 140px; }
+  .update-banner .up-download { flex: 1 1 100%; }
+
+  .app-footer {
+    gap: 10px 14px;
+    flex-wrap: wrap;
+  }
+  .app-footer .footer-last { margin-left: 0; flex: 1 1 100%; text-align: left; }
+
+  .btn-row { gap: 8px; }
+  .btn-row button { flex: 1 1 calc(50% - 4px); min-width: 0; }
+}
+
+/* Phone — aggressive compaction */
+@media (max-width: 480px) {
+  body.controller-mode {
+    padding: 32px 8px 14px;
+  }
+
+  .brand-row { gap: 8px; }
+  .brand { font-size: clamp(16px, 7vw, 30px); letter-spacing: -0.03em; }
+  .brand-icon { height: clamp(34px, 10vw, 48px); }
+
+  .instructions { font-size: 11.5px; padding: 10px 12px; }
+  .instructions code { font-size: 10.5px; padding: 1px 6px; }
+
+  .now-showing { padding: 14px 14px; gap: 10px 14px; }
+  .now-showing .num { font-size: 42px; letter-spacing: -1.5px; }
+  .now-showing .title { font-size: 14.5px; flex-basis: 110px; }
+  .now-showing .cs-timer { font-size: 11px; margin-top: 6px; }
+  .now-showing .next-up .next-num { font-size: 18px; }
+  .now-showing .next-up .next-title { font-size: 12px; }
+
+  .nav-row { gap: 6px; margin: 10px 0 6px; }
+  .nav-row button { padding: 11px 4px; font-size: 10.5px; letter-spacing: 0; }
+
+  .shortcut { font-size: 10px; margin: 4px 0 14px; line-height: 1.5; }
+
+  .card { padding: 14px; border-radius: 12px; }
+  .card h2 { font-size: 9px; }
+  .header-btn {
+    padding: 5px 10px !important;
+    font-size: 9px !important;
+  }
+
+  .routine-item { padding: 11px 12px; gap: 10px; }
+  .routine-item .r-num { font-size: 17px; min-width: 36px; }
+  .routine-item.active .r-num { font-size: 19px; }
+  .routine-item .r-title { font-size: 14px; }
+
+  .tools-row.main-grid .routine-list {
+    max-height: 44vh !important;
+  }
+
+  .keypad-display { font-size: 24px; padding: 12px; min-height: 32px; letter-spacing: 2px; }
+  .kp-btn { padding: 14px 0; font-size: 18px; }
+  .keypad-grid { gap: 6px; }
+
+  input[type="text"] { font-size: 13px; padding: 10px 12px; }
+  textarea { font-size: 12px; min-height: 140px; }
+
+  /* Footer: let it stack cleanly */
+  .app-footer { padding: 12px 10px; font-size: 11px; }
+  .app-footer #update-check-btn {
+    padding: 5px 10px !important;
+    font-size: 10px !important;
+  }
+
+  .card-header-row { gap: 8px; flex-wrap: wrap; }
+  .card-header-row h2 { flex: 1 1 100%; }
+}
