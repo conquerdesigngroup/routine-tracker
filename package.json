@@ -1,6 +1,6 @@
 {
   "name": "routine-tracker",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "OBS overlay controller for dance competition routines",
   "main": "main.js",
   "scripts": {
@@ -23,8 +23,15 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "identity": null,
       "icon": "build/icon.icns",
+      "identity": "tony zuppardo (74A7NU2R45)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": {
+        "teamId": "74A7NU2R45"
+      },
       "target": [
         { "target": "dmg", "arch": ["arm64", "x64"] }
       ],

@@ -3,3 +3,12 @@ dist/
 .DS_Store
 test-schedule.pdf
 *.log
+
+# Signing — never commit certs or credentials
+.env
+*.env
+*.p12
+*.pem
+*.key
+*.cer
+*.certSigningRequest

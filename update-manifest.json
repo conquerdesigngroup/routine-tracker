@@ -1,6 +1,6 @@
 {
-  "version": "1.2.0",
-  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.0/Routine-Tracker-1.2.0-arm64.dmg",
-  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.0/Routine-Tracker-1.2.0-x64.dmg",
-  "releaseNotes": "New Message Overlay — a second OBS browser source (#messages) that scrolls typed messages right-to-left, news-ticker style. Independent of the routine overlay."
+  "version": "1.2.1",
+  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.1/Routine-Tracker-1.2.1-arm64.dmg",
+  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.1/Routine-Tracker-1.2.1-x64.dmg",
+  "releaseNotes": "Signed & notarized by Apple — no more \"App is damaged\" warning on install. From here on, just download and double-click."
 }
