@@ -6,7 +6,8 @@ const path = require('path');
 const PREFERRED_PORT = 7423;
 let activePort = PREFERRED_PORT;
 
-let state = { routines: [], current: null, hidden: false, clearedBackup: null, message: { text: '', visible: false } };
+const OVERLAY_TEXT_STYLES = ['shadow', 'outline', 'none'];
+let state = { routines: [], current: null, hidden: false, clearedBackup: null, message: { text: '', visible: false }, routineFont: 'Avega', messageFont: 'Avega', overlayTextStyle: 'shadow' };
 let stateFile;
 
 function loadPersistedState() {
@@ -16,6 +17,11 @@ function loadPersistedState() {
     if (!state.routines) state.routines = [];
     if (!('clearedBackup' in state)) state.clearedBackup = null;
     if (!state.message || typeof state.message !== 'object') state.message = { text: '', visible: false };
+    const legacy = typeof state.overlayFont === 'string' ? state.overlayFont : 'Avega';
+    if (typeof state.routineFont !== 'string') state.routineFont = legacy;
+    if (typeof state.messageFont !== 'string') state.messageFont = legacy;
+    if (!OVERLAY_TEXT_STYLES.includes(state.overlayTextStyle)) state.overlayTextStyle = 'shadow';
+    delete state.overlayFont;
   } catch (_) {}
 }
 
@@ -80,6 +86,7 @@ function createServer() {
           const next = JSON.parse(body);
           if (typeof next !== 'object' || !next) throw new Error('bad payload');
           const nextMsg = (next.message && typeof next.message === 'object') ? next.message : null;
+          const legacyFont = typeof next.overlayFont === 'string' ? next.overlayFont : 'Avega';
           state = {
             routines: next.routines || [],
             current: next.current ?? null,
@@ -87,7 +94,10 @@ function createServer() {
             clearedBackup: next.clearedBackup ?? null,
             message: nextMsg
               ? { text: typeof nextMsg.text === 'string' ? nextMsg.text : '', visible: !!nextMsg.visible }
-              : { text: '', visible: false }
+              : { text: '', visible: false },
+            routineFont: typeof next.routineFont === 'string' ? next.routineFont : legacyFont,
+            messageFont: typeof next.messageFont === 'string' ? next.messageFont : legacyFont,
+            overlayTextStyle: OVERLAY_TEXT_STYLES.includes(next.overlayTextStyle) ? next.overlayTextStyle : 'shadow'
           };
           savePersistedState();
           res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -26,21 +26,69 @@ let updateInfo = null;
 
 // state.current = null OR { number, title, fromIndex: number|null, isDropIn: bool }
 // state.hidden = true means overlay is blanked but the current position is kept
+// Catalog of overlay fonts. Keep keys in sync with the @font-face declarations
+// in styles.css and the <option> values in index.html.
+const OVERLAY_FONTS = {
+  'Avega':                'Avega, Poppins, sans-serif',
+  'Franie Black Italic':  '"Franie Black Italic", Poppins, sans-serif',
+  'Know':                 'Know, Poppins, sans-serif',
+  'Railway Gank':         '"Railway Gank", Poppins, sans-serif'
+};
+const DEFAULT_OVERLAY_FONT = 'Avega';
+
+function normalizeOverlayFont(name) {
+  return (name && OVERLAY_FONTS[name]) ? name : DEFAULT_OVERLAY_FONT;
+}
+
+function applyRoutineFont(name) {
+  const stack = OVERLAY_FONTS[normalizeOverlayFont(name)];
+  document.documentElement.style.setProperty('--routine-font', stack);
+}
+
+function applyMessageFont(name) {
+  const stack = OVERLAY_FONTS[normalizeOverlayFont(name)];
+  document.documentElement.style.setProperty('--message-font', stack);
+}
+
+function applyAllFonts() {
+  applyRoutineFont(state.routineFont);
+  applyMessageFont(state.messageFont);
+}
+
+// Catalog of overlay text-style options. Stored in state so the choice syncs
+// across the controller + both OBS browser sources.
+const OVERLAY_TEXT_STYLES = ['shadow', 'outline', 'none'];
+const DEFAULT_OVERLAY_TEXT_STYLE = 'shadow';
+
+function normalizeOverlayTextStyle(name) {
+  return OVERLAY_TEXT_STYLES.includes(name) ? name : DEFAULT_OVERLAY_TEXT_STYLE;
+}
+
+function applyOverlayTextStyle(name) {
+  document.documentElement.dataset.overlayStyle = normalizeOverlayTextStyle(name);
+}
+
 let state = {
   routines: [],
   current: null,
   hidden: false,
   clearedBackup: null,
-  message: { text: '', visible: false }
+  message: { text: '', visible: false },
+  routineFont: DEFAULT_OVERLAY_FONT,
+  messageFont: DEFAULT_OVERLAY_FONT,
+  overlayTextStyle: DEFAULT_OVERLAY_TEXT_STYLE
 };
 let serverMode = false;   // true = sync via server API (Electron); false = localStorage only
 let lastServerJSON = '';  // last JSON we've seen from server, for change detection
+let lastPollOk = 0;       // timestamp of last successful server poll (for conn status)
+const POLL_STALE_MS = 5000; // poll older than this → conn-status flips to "error"
 
 async function detectServerMode() {
   try {
     const resp = await fetch(API_URL, { method: 'GET', cache: 'no-store' });
     if (resp.ok) {
       serverMode = true;
+      lastPollOk = Date.now();
       const data = await resp.json();
       applyRemoteState(data);
       // Recovery: if the server lost its state but localStorage still has
@@ -52,11 +100,16 @@ async function detectServerMode() {
           if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed && Array.isArray(parsed.routines) && parsed.routines.length > 0) {
+              const legacy = parsed.overlayFont;
               state = {
                 routines: parsed.routines,
                 current: parsed.current ?? null,
                 hidden: !!parsed.hidden,
-                clearedBackup: parsed.clearedBackup || null
+                clearedBackup: parsed.clearedBackup || null,
+                message: normalizeMessage(parsed.message),
+                routineFont: normalizeOverlayFont(parsed.routineFont ?? legacy),
+                messageFont: normalizeOverlayFont(parsed.messageFont ?? legacy),
+                overlayTextStyle: normalizeOverlayTextStyle(parsed.overlayTextStyle)
               };
               saveState();
             }
@@ -71,14 +124,20 @@ async function detectServerMode() {
 }
 
 function applyRemoteState(data) {
+  const legacy = data.overlayFont;
   state = {
     routines: Array.isArray(data.routines) ? data.routines : [],
     current: data.current ?? null,
     hidden: !!data.hidden,
     clearedBackup: data.clearedBackup || null,
-    message: normalizeMessage(data.message)
+    message: normalizeMessage(data.message),
+    routineFont: normalizeOverlayFont(data.routineFont ?? legacy),
+    messageFont: normalizeOverlayFont(data.messageFont ?? legacy),
+    overlayTextStyle: normalizeOverlayTextStyle(data.overlayTextStyle)
   };
   lastServerJSON = JSON.stringify(state);
+  applyAllFonts();
+  applyOverlayTextStyle(state.overlayTextStyle);
 }
 
 function normalizeMessage(m) {
@@ -91,13 +150,19 @@ function loadLocalState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const legacy = parsed.overlayFont;
       state = {
         routines: Array.isArray(parsed.routines) ? parsed.routines : [],
         current: parsed.current ?? null,
         hidden: !!parsed.hidden,
         clearedBackup: parsed.clearedBackup || null,
-        message: normalizeMessage(parsed.message)
+        message: normalizeMessage(parsed.message),
+        routineFont: normalizeOverlayFont(parsed.routineFont ?? legacy),
+        messageFont: normalizeOverlayFont(parsed.messageFont ?? legacy),
+        overlayTextStyle: normalizeOverlayTextStyle(parsed.overlayTextStyle)
       };
+      applyAllFonts();
+      applyOverlayTextStyle(state.overlayTextStyle);
       return;
     }
     const old = localStorage.getItem(OLD_STORAGE_KEY);
@@ -226,9 +291,12 @@ async function pollServerState() {
     const resp = await fetch(API_URL, { method: 'GET', cache: 'no-store' });
     if (!resp.ok) return;
     const txt = await resp.text();
+    lastPollOk = Date.now();
     if (txt === lastServerJSON) return;
     lastServerJSON = txt;
     applyRemoteState(JSON.parse(txt));
+    applyAllFonts();
+    applyOverlayTextStyle(state.overlayTextStyle);
     render();
   } catch (_) {}
 }
@@ -382,17 +450,34 @@ function setCurrentDropIn(number, title) {
 }
 
 // ========= RENDERING =========
+// Compute the exact text the routine OBS overlay would show for the current
+// state. Returns '' when the overlay would be blank (hidden / no current).
+function currentOverlayText() {
+  if (state.hidden || !state.current || !state.current.number) return '';
+  const title = state.current.title || '';
+  return title ? `${state.current.number} - ${title}` : state.current.number;
+}
+
 function renderOverlay() {
   const el = document.getElementById('ov-text');
   if (!el) return;
-  if (state.hidden || !state.current || !state.current.number) {
+  const text = currentOverlayText();
+  if (!text) {
     el.textContent = '';
     el.style.visibility = 'hidden';
     return;
   }
   el.style.visibility = 'visible';
-  const title = state.current.title || '';
-  el.textContent = title ? `${state.current.number} - ${title}` : state.current.number;
+  el.textContent = text;
+}
+
+function renderOverlayPreview() {
+  const strip = document.getElementById('overlay-preview-strip');
+  const text = document.getElementById('ov-preview-text');
+  if (!strip || !text) return;
+  const t = currentOverlayText();
+  text.textContent = t;
+  strip.classList.toggle('is-empty', !t);
 }
 
 function renderController() {
@@ -419,6 +504,7 @@ function renderController() {
     hideBtn.classList.toggle('hidden-active', !!state.hidden);
   }
 
+  renderOverlayPreview();
   updateElapsedTimer();
 
   // Next Up: shown only when the current routine came from the list and has a successor
@@ -505,11 +591,24 @@ function renderController() {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const i = parseInt(el.dataset.del);
+        const removed = state.routines[i];
+        // Snapshot just enough to put the routine back exactly where it was,
+        // including the current pointer's relationship to it.
+        const prevCurrent = state.current ? { ...state.current } : null;
         state.routines.splice(i, 1);
         if (state.current && state.current.fromIndex === i) state.current = null;
         else if (state.current && state.current.fromIndex > i) state.current.fromIndex--;
         saveState();
         render();
+        if (removed) {
+          const label = removed.title ? `"${removed.title}"` : `#${removed.number}`;
+          showUndoToast(`Removed ${label}`, () => {
+            state.routines.splice(i, 0, removed);
+            state.current = prevCurrent;
+            saveState();
+            render();
+          });
+        }
       });
     });
 
@@ -534,6 +633,56 @@ function render() {
   else renderController();
 }
 
+// Build a seamless news-ticker inside `track`. Duplicates the text enough times
+// that one copy is always entering as another exits, then animates a translateX
+// of exactly one item-width. When the keyframes loop, the next copy is already
+// in position — no visible gap.
+function buildTicker(track, text, options) {
+  if (!track) return;
+  const opts = options || {};
+  const speed = opts.speed || 150;            // px/sec
+  const trimmed = (text || '').trim();
+
+  if (!trimmed) {
+    track.innerHTML = '';
+    track.classList.remove('scrolling');
+    delete track.dataset.text;
+    return;
+  }
+
+  // Build first copy and measure it
+  track.classList.remove('scrolling');
+  track.innerHTML = '';
+  const first = document.createElement('span');
+  first.className = 'ticker-item';
+  first.textContent = trimmed;
+  track.appendChild(first);
+  void track.offsetWidth;
+  const itemWidth = first.offsetWidth;
+  if (itemWidth <= 0) return;
+
+  // Duplicate enough times that the visible viewport is covered + buffer
+  const viewportWidth =
+    opts.viewportWidth ||
+    (track.parentElement ? track.parentElement.offsetWidth : 0) ||
+    window.innerWidth;
+  const copies = Math.max(2, Math.ceil((viewportWidth + itemWidth) / itemWidth) + 1);
+  for (let i = 1; i < copies; i++) {
+    const c = first.cloneNode(true);
+    c.setAttribute('aria-hidden', 'true');
+    track.appendChild(c);
+  }
+
+  const duration = Math.max(2, itemWidth / speed);
+  track.style.setProperty('--ticker-duration', duration + 's');
+  track.style.setProperty('--ticker-shift', '-' + itemWidth + 'px');
+  track.dataset.text = trimmed;
+
+  // Restart animation
+  void track.offsetWidth;
+  track.classList.add('scrolling');
+}
+
 function renderMessagesOverlay() {
   const track = document.getElementById('msg-ticker');
   if (!track) return;
@@ -541,28 +690,18 @@ function renderMessagesOverlay() {
   const shouldShow = msg.visible && msg.text && msg.text.trim().length > 0;
 
   if (!shouldShow) {
-    track.textContent = '';
+    track.innerHTML = '';
     track.classList.remove('scrolling');
+    delete track.dataset.text;
     track.style.visibility = 'hidden';
     return;
   }
 
   track.style.visibility = 'visible';
-  // Only reset animation when the text actually changes, so in-flight scrolls
-  // aren't restarted on unrelated state polls.
-  if (track.textContent !== msg.text) {
-    track.textContent = msg.text;
-    // Force layout so offsetWidth is accurate, then pick a duration that keeps
-    // scroll speed constant regardless of message length.
-    void track.offsetWidth;
-    const SPEED_PX_PER_SEC = 150;
-    const totalDistance = window.innerWidth + track.offsetWidth;
-    const duration = Math.max(8, totalDistance / SPEED_PX_PER_SEC);
-    track.style.setProperty('--ticker-duration', duration + 's');
-    // Restart animation from the right
-    track.classList.remove('scrolling');
-    void track.offsetWidth;
-    track.classList.add('scrolling');
+  // Only rebuild when the text actually changes, so in-flight scrolls aren't
+  // restarted on unrelated state polls.
+  if (track.dataset.text !== msg.text.trim()) {
+    buildTicker(track, msg.text, { viewportWidth: window.innerWidth });
   } else if (!track.classList.contains('scrolling')) {
     track.classList.add('scrolling');
   }
@@ -594,6 +733,71 @@ let keypadValue = '';
 let routineFilter = '';
 const HIDE_SHOWN_KEY = 'rt-hide-shown-v1';
 let hideShown = localStorage.getItem(HIDE_SHOWN_KEY) === 'true';
+const SHOW_MODE_KEY = 'rt-show-mode-v1';
+let showMode = localStorage.getItem(SHOW_MODE_KEY) === 'true';
+
+function applyShowMode() {
+  document.body.classList.toggle('show-mode', showMode);
+  const btn = document.getElementById('mode-toggle');
+  if (btn) {
+    btn.textContent = showMode ? '⚙ Exit Show Mode' : '🎬 Enter Show Mode';
+    btn.classList.toggle('show-mode-active', showMode);
+  }
+}
+
+// ========= CONNECTION STATUS =========
+// Reflects whether the controller is talking to the Electron server, running
+// in localStorage-only mode, or has lost touch with a server it was using.
+function updateConnStatus() {
+  const el = document.getElementById('conn-status');
+  if (!el) return;
+  let s, label;
+  if (!serverMode) {
+    s = 'local';
+    label = 'Local only';
+  } else if (Date.now() - lastPollOk > POLL_STALE_MS) {
+    s = 'error';
+    label = 'Server unreachable';
+  } else {
+    s = 'ok';
+    label = 'Connected';
+  }
+  if (el.dataset.state !== s) el.dataset.state = s;
+  const lbl = el.querySelector('.conn-label');
+  if (lbl && lbl.textContent !== label) lbl.textContent = label;
+}
+
+// ========= UNDO TOAST =========
+// Lightweight toast pill at the bottom of the screen. Single-slot — a new
+// toast replaces any in-flight one so the user always sees the latest action.
+let undoTimer = null;
+function showUndoToast(message, onUndo, durationMs) {
+  const toast = document.getElementById('undo-toast');
+  const text = document.getElementById('undo-toast-text');
+  const btn = document.getElementById('undo-toast-btn');
+  const close = document.getElementById('undo-toast-close');
+  if (!toast || !text || !btn || !close) return;
+  text.textContent = message;
+  toast.classList.add('visible');
+  // The CSS transitions opacity + transform; display:flex lets it hit-test.
+  toast.style.display = 'flex';
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(hideUndoToast, durationMs || 7000);
+  btn.onclick = () => {
+    hideUndoToast();
+    try { onUndo && onUndo(); } catch (e) { console.error(e); }
+  };
+  close.onclick = hideUndoToast;
+}
+function hideUndoToast() {
+  const toast = document.getElementById('undo-toast');
+  if (!toast) return;
+  toast.classList.remove('visible');
+  // Match the CSS transition (180ms) before removing from layout.
+  setTimeout(() => { toast.style.display = 'none'; }, 200);
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = null;
+}
 
 function updateKeypadDisplay() {
   const disp = document.getElementById('kp-display');
@@ -672,7 +876,12 @@ function dropInAdd() {
 
 // ========= STORAGE SYNC =========
 window.addEventListener('storage', (e) => {
-  if (e.key === STORAGE_KEY && !serverMode) { loadLocalState(); render(); }
+  if (e.key === STORAGE_KEY && !serverMode) {
+    loadLocalState();
+    applyAllFonts();
+    applyOverlayTextStyle(state.overlayTextStyle);
+    render();
+  }
 });
 
 // ========= SETUP =========
@@ -700,14 +909,28 @@ if (!isOverlay) {
 
   function clearAllRoutines() {
     if (!confirm('Clear all routines?')) return;
-    const backup = state.routines.length > 0
-      ? { routines: state.routines, at: new Date().toISOString() }
+    const cleared = state.routines;
+    const backup = cleared.length > 0
+      ? { routines: cleared, at: new Date().toISOString() }
       : (state.clearedBackup || null);
-    state = { routines: [], current: null, hidden: false, clearedBackup: backup };
+    state = {
+      routines: [], current: null, hidden: false, clearedBackup: backup,
+      message: state.message, routineFont: state.routineFont, messageFont: state.messageFont,
+      overlayTextStyle: state.overlayTextStyle
+    };
     const input = document.getElementById('routine-input');
     if (input) input.value = '';
     saveState();
     render();
+    if (cleared.length > 0) {
+      const noun = cleared.length === 1 ? 'routine' : 'routines';
+      showUndoToast(`Cleared ${cleared.length} ${noun}`, () => {
+        state.routines = cleared;
+        state.clearedBackup = null;
+        saveState();
+        render();
+      });
+    }
   }
   document.getElementById('clear-all-btn').addEventListener('click', clearAllRoutines);
   const headerClear = document.getElementById('clear-list-btn');
@@ -837,11 +1060,96 @@ if (!isOverlay) {
   document.getElementById('kp-clear').addEventListener('click', keypadClear);
   document.getElementById('kp-show').addEventListener('click', keypadShow);
 
+  // Routine overlay font dropdown
+  const routineFontSelect = document.getElementById('routine-font-select');
+  if (routineFontSelect) {
+    routineFontSelect.value = normalizeOverlayFont(state.routineFont);
+    routineFontSelect.addEventListener('change', () => {
+      state.routineFont = normalizeOverlayFont(routineFontSelect.value);
+      applyRoutineFont(state.routineFont);
+      saveState();
+    });
+  }
+
+  // Message overlay font dropdown
+  const messageFontSelect = document.getElementById('overlay-font-select');
+  if (messageFontSelect) {
+    messageFontSelect.value = normalizeOverlayFont(state.messageFont);
+    messageFontSelect.addEventListener('change', () => {
+      state.messageFont = normalizeOverlayFont(messageFontSelect.value);
+      applyMessageFont(state.messageFont);
+      saveState();
+      // Refresh the live preview so its measurements pick up the new font
+      const evt = new Event('input', { bubbles: true });
+      const inp = document.getElementById('msg-input');
+      if (inp) inp.dispatchEvent(evt);
+    });
+  }
+
+  // Overlay text-style toggle (shadow / outline / plain) — applies to both
+  // overlays + the OBS preview strip via a :root[data-overlay-style] hook.
+  const styleToggle = document.getElementById('text-style-toggle');
+  if (styleToggle) {
+    const syncStyleButtons = () => {
+      const active = normalizeOverlayTextStyle(state.overlayTextStyle);
+      styleToggle.querySelectorAll('.text-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === active);
+      });
+    };
+    syncStyleButtons();
+    styleToggle.querySelectorAll('.text-style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.overlayTextStyle = normalizeOverlayTextStyle(btn.dataset.style);
+        applyOverlayTextStyle(state.overlayTextStyle);
+        syncStyleButtons();
+        saveState();
+        // Refresh the message-input preview so it visually picks up the new style
+        const inp = document.getElementById('msg-input');
+        if (inp) inp.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
+  }
+
+  // Persist the open/closed state of the collapsible setup banners
+  ['instructions-details', 'obs-url-banner'].forEach(id => {
+    const det = document.getElementById(id);
+    if (!det) return;
+    const key = 'rt-details-open-' + id;
+    const stored = localStorage.getItem(key);
+    if (stored === 'true') det.open = true;
+    else if (stored === 'false') det.open = false;
+    // Default: instructions closed (read-once), URL banner open (frequently used).
+    else if (id === 'instructions-details') det.open = false;
+    else det.open = true;
+    det.addEventListener('toggle', () => {
+      try { localStorage.setItem(key, String(det.open)); } catch (_) {}
+    });
+  });
+
   // Message overlay
   const msgInput = document.getElementById('msg-input');
   const msgShowBtn = document.getElementById('msg-show');
   const msgHideBtn = document.getElementById('msg-hide');
+  const msgPreviewBox = document.querySelector('.ticker-preview');
+
+  function updateMsgPreview() {
+    if (!msgPreviewBox || !msgInput) return;
+    const text = msgInput.value;
+    if (!text || !text.trim()) {
+      msgPreviewBox.innerHTML = '<div class="ticker-preview-empty">Type a message to preview…</div>';
+      return;
+    }
+    let track = msgPreviewBox.querySelector('.ticker-track');
+    if (!track) {
+      msgPreviewBox.innerHTML = '<div class="ticker-track" id="msg-preview-track"></div>';
+      track = msgPreviewBox.querySelector('.ticker-track');
+    }
+    buildTicker(track, text, { viewportWidth: msgPreviewBox.clientWidth });
+  }
+
   if (msgInput && state.message && state.message.text) msgInput.value = state.message.text;
+  updateMsgPreview();
+
   if (msgShowBtn && msgInput) {
     msgShowBtn.addEventListener('click', () => {
       const text = msgInput.value.trim();
@@ -850,6 +1158,7 @@ if (!isOverlay) {
       saveState();
       render();
     });
+    msgInput.addEventListener('input', updateMsgPreview);
     msgInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') msgShowBtn.click();
     });
@@ -861,6 +1170,10 @@ if (!isOverlay) {
       render();
     });
   }
+  // Re-tile the preview if the window resizes (changes preview box width)
+  window.addEventListener('resize', () => {
+    if (msgInput && msgInput.value && msgInput.value.trim()) updateMsgPreview();
+  });
 
   // Drop-in
   document.getElementById('di-show').addEventListener('click', dropInShow);
@@ -910,6 +1223,19 @@ if (!isOverlay) {
       if (filterInput) filterInput.value = '';
       renderController();
       filterInput && filterInput.focus();
+    });
+  }
+
+  // Show Mode toggle — collapses setup-only chrome and enlarges the readout
+  const modeToggle = document.getElementById('mode-toggle');
+  if (modeToggle) {
+    applyShowMode();
+    modeToggle.addEventListener('click', () => {
+      showMode = !showMode;
+      try { localStorage.setItem(SHOW_MODE_KEY, String(showMode)); } catch (_) {}
+      applyShowMode();
+      // Mode flip changes which card is the keypad's sibling height-wise; the
+      // ResizeObserver on .routine-list reacts on its own once layout settles.
     });
   }
 
@@ -965,6 +1291,29 @@ if (!isOverlay) {
 (async () => {
   await detectServerMode();
   await loadCurrentVersion();
+  applyAllFonts();
+  applyOverlayTextStyle(state.overlayTextStyle);
+  updateConnStatus();
+  // Sync the dropdowns + style buttons to whatever loaded from storage/server
+  // (the listener setup ran before state was loaded, so the initial values
+  // reflected the defaults, not the persisted choices).
+  const rfs = document.getElementById('routine-font-select');
+  if (rfs) rfs.value = normalizeOverlayFont(state.routineFont);
+  const fs = document.getElementById('overlay-font-select');
+  if (fs) fs.value = normalizeOverlayFont(state.messageFont);
+  const styleToggleBoot = document.getElementById('text-style-toggle');
+  if (styleToggleBoot) {
+    const active = normalizeOverlayTextStyle(state.overlayTextStyle);
+    styleToggleBoot.querySelectorAll('.text-style-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.style === active);
+    });
+  }
+  // Same with the message input
+  const mi = document.getElementById('msg-input');
+  if (mi && state.message && state.message.text) {
+    mi.value = state.message.text;
+    mi.dispatchEvent(new Event('input', { bubbles: true }));
+  }
   render();
   renderFooter();
 
@@ -1010,6 +1359,16 @@ if (!isOverlay) {
   if (serverMode) {
     setInterval(pollServerState, isAnyOverlay ? 400 : 1000);
   } else if (isAnyOverlay) {
-    setInterval(() => { loadLocalState(); render(); }, 500);
+    setInterval(() => {
+      loadLocalState();
+      applyAllFonts();
+      applyOverlayTextStyle(state.overlayTextStyle);
+      render();
+    }, 500);
+  }
+  // Refresh the connection-status pill every second in the controller —
+  // catches the moment a server poll goes stale.
+  if (!isAnyOverlay) {
+    setInterval(updateConnStatus, 1000);
   }
 })();

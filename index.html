@@ -30,13 +30,20 @@
 
 <!-- CONTROLLER -->
 <div class="controller">
+  <div class="mode-toolbar">
+    <div class="conn-status" id="conn-status" data-state="local" title="Connection status">
+      <span class="conn-dot"></span>
+      <span class="conn-label">Local only</span>
+    </div>
+    <button id="mode-toggle" class="mode-toggle" title="Toggle Show Mode — hides setup chrome and enlarges the LED readout">🎬 Enter Show Mode</button>
+  </div>
   <div class="brand-row">
     <img src="images/app-icon.png" class="brand-icon" alt="">
     <div class="brand"><span class="brand-1">routine</span><span class="brand-slash"></span><span class="brand-2">tracker</span></div>
   </div>
-  <div class="sub">Click a routine, use the keypad, or drop in a new one — the OBS overlay updates instantly.</div>
+  <div class="sub setup-only">Click a routine, use the keypad, or drop in a new one — the OBS overlay updates instantly.</div>
 
-  <div class="update-banner" id="update-banner" style="display:none">
+  <div class="update-banner setup-only" id="update-banner" style="display:none">
     <div class="up-icon">⬆</div>
     <div class="up-text">
       <div class="up-heading">New version available — <span class="up-version">v?</span></div>
@@ -45,43 +52,57 @@
     <button class="primary up-download">Download</button>
   </div>
 
-  <div class="obs-url-banner" id="obs-url-banner" style="display:none">
-    <div class="obs-url-row">
-      <div class="obs-url-label">Routines</div>
-      <code class="obs-url-value" data-kind="overlay">—</code>
-      <button class="obs-url-copy" data-copy="overlay">Copy</button>
+  <details class="obs-url-banner setup-only" id="obs-url-banner" style="display:none">
+    <summary><span class="banner-summary-label">OBS Browser Source URLs</span><span class="banner-summary-hint">click to expand</span></summary>
+    <div class="banner-body">
+      <div class="obs-url-row">
+        <div class="obs-url-label">Routines</div>
+        <code class="obs-url-value" data-kind="overlay">—</code>
+        <button class="obs-url-copy" data-copy="overlay">Copy</button>
+      </div>
+      <div class="obs-url-row">
+        <div class="obs-url-label">Messages</div>
+        <code class="obs-url-value" data-kind="messages">—</code>
+        <button class="obs-url-copy" data-copy="messages">Copy</button>
+      </div>
     </div>
-    <div class="obs-url-row">
-      <div class="obs-url-label">Messages</div>
-      <code class="obs-url-value" data-kind="messages">—</code>
-      <button class="obs-url-copy" data-copy="messages">Copy</button>
-    </div>
-  </div>
+  </details>
 
-  <div class="instructions">
-    <b>OBS setup:</b> Add <b>two</b> Browser Sources — one ending in <code>#overlay</code> for the routine number/title, and one ending in <code>#messages</code> for the scrolling-text ticker. Width 1920, height 1080, transparent. Open the same file <i>without</i> a hash (or add it as a Custom Browser Dock) — that's your controller.
-  </div>
-
-  <div class="now-showing">
-    <div class="left">
-      <div class="label">On Stream</div>
-      <div class="num" id="cs-number">—</div>
-      <div class="cs-timer" id="cs-timer"></div>
+  <details class="instructions setup-only" id="instructions-details">
+    <summary><span class="banner-summary-label">OBS setup — wiring up Browser Sources</span><span class="banner-summary-hint">click to expand</span></summary>
+    <div class="banner-body">
+      Add <b>two</b> Browser Sources — one ending in <code>#overlay</code> for the routine number/title, and one ending in <code>#messages</code> for the scrolling-text ticker. Width 1920, height 1080, transparent. Open the same file <i>without</i> a hash (or add it as a Custom Browser Dock) — that's your controller.
     </div>
-    <div class="title" id="cs-title">Nothing showing</div>
-    <div class="next-up" id="next-up" style="display:none">
-      <div class="label">Next Up</div>
-      <div class="next-num" id="nu-number">—</div>
-      <div class="next-title" id="nu-title"></div>
+  </details>
+
+  <div class="live-header">
+    <div class="now-showing">
+      <div class="left">
+        <div class="label">On Stream</div>
+        <div class="num" id="cs-number">—</div>
+        <div class="cs-timer" id="cs-timer"></div>
+      </div>
+      <div class="title" id="cs-title">Nothing showing</div>
+      <div class="next-up" id="next-up" style="display:none">
+        <div class="label">Next Up</div>
+        <div class="next-num" id="nu-number">—</div>
+        <div class="next-title" id="nu-title"></div>
+      </div>
+    </div>
+
+    <div class="overlay-preview-strip" id="overlay-preview-strip" aria-label="OBS routine overlay preview">
+      <span class="overlay-preview-tag">OBS</span>
+      <div class="overlay-preview-text" id="ov-preview-text"></div>
+      <span class="overlay-preview-empty">Nothing on stream</span>
+    </div>
+
+    <div class="nav-row">
+      <button id="prev-btn">◀ Previous</button>
+      <button id="next-btn" class="primary">Next ▶</button>
+      <button id="clear-btn" class="ghost">Hide Overlay</button>
     </div>
   </div>
-
-  <div class="nav-row">
-    <button id="prev-btn">◀ Previous</button>
-    <button id="next-btn" class="primary">Next ▶</button>
-    <button id="clear-btn" class="ghost">Hide Overlay</button>
-  </div>
-  <div class="shortcut">← Previous &nbsp;•&nbsp; → / Space: Next &nbsp;•&nbsp; Esc: Hide &nbsp;•&nbsp; 0-9: Keypad &nbsp;•&nbsp; Enter: Show</div>
+  <div class="shortcut setup-only">← Previous &nbsp;•&nbsp; → / Space: Next &nbsp;•&nbsp; Esc: Hide &nbsp;•&nbsp; 0-9: Keypad &nbsp;•&nbsp; Enter: Show</div>
 
   <!-- Routines list (left) + Keypad (right) -->
   <div class="tools-row main-grid">
@@ -91,6 +112,19 @@
         <button id="reset-progress-btn" class="ghost header-btn" style="display:none" title="Un-mark every routine as shown">Reset Progress</button>
         <button id="recover-btn" class="ghost header-btn recover-btn" style="display:none" title="Restore the last list you cleared">↺ Recover Cleared</button>
         <button id="clear-list-btn" class="ghost header-btn">Clear All</button>
+      </div>
+      <label class="label setup-only">Routine overlay font</label>
+      <select id="routine-font-select" class="overlay-font-select setup-only">
+        <option value="Avega">Avega Italic (default)</option>
+        <option value="Franie Black Italic">Franie Black Italic</option>
+        <option value="Know">Know</option>
+        <option value="Railway Gank">Railway Gank</option>
+      </select>
+      <label class="label setup-only">Overlay text style (applies to both overlays)</label>
+      <div class="text-style-toggle setup-only" id="text-style-toggle">
+        <button class="text-style-btn" data-style="shadow">Shadow</button>
+        <button class="text-style-btn" data-style="outline">Outline</button>
+        <button class="text-style-btn" data-style="none">Plain</button>
       </div>
       <div class="routine-filter-row" id="routine-filter-row" style="display:none">
         <input type="text" id="routine-filter" placeholder="Filter by number or title…" autocomplete="off">
@@ -129,11 +163,22 @@
   </div>
 
   <!-- Message overlay control (ticker on the #messages OBS source) -->
-  <div class="tools-row message-row">
+  <div class="tools-row message-row setup-only">
     <div class="card">
       <h2>📣 Message Overlay (scrolling ticker)</h2>
+      <label class="label">Message overlay font</label>
+      <select id="overlay-font-select" class="overlay-font-select">
+        <option value="Avega">Avega Italic (default)</option>
+        <option value="Franie Black Italic">Franie Black Italic</option>
+        <option value="Know">Know</option>
+        <option value="Railway Gank">Railway Gank</option>
+      </select>
       <label class="label">Message</label>
       <input type="text" id="msg-input" placeholder="e.g. Intermission — back in 10 minutes" autocomplete="off">
+      <label class="label">Preview</label>
+      <div class="ticker-preview">
+        <div class="ticker-track" id="msg-preview-track"></div>
+      </div>
       <div class="btn-row">
         <button id="msg-show" class="primary" style="flex:2">Show on Stream</button>
         <button id="msg-hide" class="ghost">Hide Message</button>
@@ -143,7 +188,7 @@
   </div>
 
   <!-- Drop-in routine (secondary tool) -->
-  <div class="tools-row">
+  <div class="tools-row input-row">
     <div class="card">
       <h2>➕ Drop-in Routine</h2>
       <label class="label">Routine Number</label>
@@ -157,7 +202,7 @@
       <div class="hint"><b>Show Now</b> displays without saving. <b>Add to List</b> inserts it into your routine list in numerical order (e.g. 3.5 slots between 3 and 4).</div>
     </div>
 
-    <div class="card">
+    <div class="card setup-only">
       <h2>Paste Routine List</h2>
       <textarea id="routine-input" placeholder="Paste your routines here, one per line:
 
@@ -186,6 +231,13 @@
     </label>
     <span class="footer-last" id="last-check-label"></span>
   </footer>
+</div>
+
+<div class="undo-toast" id="undo-toast" role="status" aria-live="polite">
+  <span class="undo-toast-icon">↺</span>
+  <span class="undo-toast-text" id="undo-toast-text"></span>
+  <button class="undo-toast-btn" id="undo-toast-btn">Undo</button>
+  <button class="undo-toast-close" id="undo-toast-close" aria-label="Dismiss">✕</button>
 </div>
 
 <script src="js/app.js"></script>

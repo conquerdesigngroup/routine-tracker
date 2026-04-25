@@ -1,6 +1,6 @@
 {
-  "version": "1.2.2",
-  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.2/Routine-Tracker-1.2.2-arm64.dmg",
-  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.2.2/Routine-Tracker-1.2.2-x64.dmg",
-  "releaseNotes": "Fix the OBS URL banner at narrow window widths — labels and URLs no longer get squashed into a tiny vertical strip."
+  "version": "1.3.0",
+  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.3.0/Routine-Tracker-1.3.0-arm64.dmg",
+  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.3.0/Routine-Tracker-1.3.0-x64.dmg",
+  "releaseNotes": "Show Mode toggle declutters the controller for live operation. Live OBS overlay preview strip mirrors what's on stream. Undo toast for routine deletes and Clear All. Connection-status pill (server / local / unreachable). Independent font selectors for routine vs message overlays. Outline / shadow / plain text-style toggle. Sticky Now Showing + Nav header. Collapsible OBS Setup banners. Next Up wraps on narrow widths instead of disappearing."
 }

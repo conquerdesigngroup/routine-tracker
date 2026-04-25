@@ -4,6 +4,9 @@ dist/
 test-schedule.pdf
 *.log
 
+# Self-referential symlink that lives in /Users/Shared/RoutineTracker
+/RoutineTracker
+
 # Signing — never commit certs or credentials
 .env
 *.env
