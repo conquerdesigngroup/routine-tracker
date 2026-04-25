@@ -30,7 +30,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "notarize": {
-        "teamId": "74A7NU2R45"
+        "teamId": "74A7NU2R45",
+        "keychainProfile": "RoutineTracker"
       },
       "target": [
         { "target": "dmg", "arch": ["arm64", "x64"] }
