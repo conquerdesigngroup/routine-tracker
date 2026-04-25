@@ -1121,9 +1121,10 @@ body.drag-active .drop-zone-hint { display: flex; }
   .keypad-display { font-size: 28px; padding: 14px; }
   .kp-btn { padding: 16px 0; font-size: 20px; }
 
-  .obs-url-banner { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
-  .obs-url-label { flex: 1 0 100%; }
-  .obs-url-value { flex: 1 1 100%; font-size: 11.5px; word-break: break-all; }
+  .obs-url-banner { padding: 10px 12px; gap: 10px; }
+  .obs-url-row { flex-wrap: wrap; gap: 4px 10px; }
+  .obs-url-label { flex: 1 1 100%; }
+  .obs-url-value { flex: 1 1 0; min-width: 0; font-size: 11.5px; word-break: break-all; }
   .obs-url-copy { flex: 0 0 auto; }
 
   .update-banner { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }

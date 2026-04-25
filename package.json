@@ -1,6 +1,6 @@
 {
   "name": "routine-tracker",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "OBS overlay controller for dance competition routines",
   "main": "main.js",
   "scripts": {
