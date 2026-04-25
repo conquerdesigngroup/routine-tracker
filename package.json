@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --mac --publish=never"
+    "build": "electron-builder --mac --publish=never && node build/notarize.js"
   },
   "build": {
     "appId": "com.routinetracker.app",
@@ -29,10 +29,7 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": {
-        "teamId": "74A7NU2R45",
-        "keychainProfile": "RoutineTracker"
-      },
+      "notarize": false,
       "target": [
         { "target": "dmg", "arch": ["arm64", "x64"] }
       ],
