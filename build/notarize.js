@@ -14,26 +14,31 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const pkg = require('../package.json');
-const version = pkg.version;
 const KEYCHAIN_PROFILE = 'RoutineTracker';
-const ARCHES = ['arm64', 'x64'];
+const DIST = 'dist';
 
 function run(cmd) {
   console.log('  $ ' + cmd);
   execSync(cmd, { stdio: 'inherit' });
 }
 
-for (const arch of ARCHES) {
-  const dmg = path.join('dist', `Routine-Tracker-${version}-${arch}.dmg`);
-  if (!fs.existsSync(dmg)) {
-    console.error(`✗ ${dmg} not found — did electron-builder fail?`);
-    process.exit(1);
-  }
+// Scan dist/ for whatever DMGs electron-builder produced — works whether the
+// target is arm64+x64, universal, or something new later without editing here.
+const dmgs = fs.existsSync(DIST)
+  ? fs.readdirSync(DIST).filter(f => f.endsWith('.dmg'))
+  : [];
+
+if (dmgs.length === 0) {
+  console.error(`✗ No .dmg files found in ${DIST}/ — did electron-builder fail?`);
+  process.exit(1);
+}
+
+for (const name of dmgs) {
+  const dmg = path.join(DIST, name);
   console.log(`\n→ Notarizing ${dmg}`);
   run(`xcrun notarytool submit "${dmg}" --keychain-profile "${KEYCHAIN_PROFILE}" --wait`);
   console.log(`→ Stapling ${dmg}`);
   run(`xcrun stapler staple "${dmg}"`);
 }
 
-console.log('\n✓ All DMGs notarized and stapled');
+console.log(`\n✓ ${dmgs.length} DMG(s) notarized and stapled`);
