@@ -1,4 +1,5 @@
-const { app, BrowserWindow, shell, clipboard, Menu } = require('electron');
+const { app, BrowserWindow, shell, clipboard, Menu, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -180,11 +181,53 @@ function createWindow() {
   Menu.setApplicationMenu(menu);
 }
 
+// ==================== AUTO-UPDATE ====================
+// Wires electron-updater to the GitHub Releases feed configured in
+// package.json's `build.publish`. Reads latest-mac.yml from the release,
+// downloads the .zip delta in the background, verifies the signature against
+// the same Developer ID cert we sign the DMG with, then prompts the user to
+// restart into the new version. No additional Apple setup beyond the
+// existing signing/notarization is required.
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;   // Skip in `electron .` dev runs.
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('error', (err) => {
+    console.error('[autoUpdater] error:', err && err.message || err);
+  });
+  autoUpdater.on('update-available', (info) => {
+    console.log('[autoUpdater] update available:', info && info.version);
+  });
+  autoUpdater.on('update-not-available', () => {
+    console.log('[autoUpdater] on latest');
+  });
+  autoUpdater.on('update-downloaded', async (info) => {
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update ready',
+      message: `Routine Tracker ${info.version} is ready to install.`,
+      detail: 'The app will restart to finish the update.'
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+
+  // First check on startup, then a heartbeat every 4 hours in case the app
+  // stays open across a release (opera-hours streaming rigs, etc.).
+  autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
+}
+
 app.whenReady().then(async () => {
   stateFile = path.join(app.getPath('userData'), 'state.json');
   loadPersistedState();
   await startServer();
   createWindow();
+  setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => {
