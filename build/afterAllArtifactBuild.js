@@ -1,24 +1,48 @@
-// Called by electron-builder after every artifact (DMG, ZIP, blockmap) has
-// been produced. We staple the notarization ticket onto each DMG so macOS
-// can verify the container itself without unpacking it.
+// Called by electron-builder after every artifact (DMG, ZIP, blockmap,
+// latest-mac.yml) has been produced. For each DMG we submit it to Apple's
+// notary service for its own ticket, then staple that ticket onto the DMG
+// file. Combined with the .app-staple that afterSign.js already produced,
+// this gives us fully offline-verifiable artifacts at every level:
 //
-// The .app INSIDE each container was already stapled during the afterSign
-// hook, so this DMG staple is belt-and-suspenders — it means users on the
-// most locked-down setups (offline first launch, strict Gatekeeper) never
-// need to phone home to Apple to verify the download.
+//   - .app inside → stapled via afterSign     → offline-clean launch
+//   - .dmg container → stapled here           → offline-clean download check
+//   - .zip container → not stapleable, but    → offline-clean auto-update
+//     the .app inside it is already stapled
 //
-// ZIPs can't be stapled (Apple's stapler doesn't support the format), but
-// the stapled .app inside the ZIP is enough for electron-updater's flow.
+// ZIPs can't be stapled (Apple's stapler doesn't accept the format), but
+// their internal .app payload is already stapled from afterSign, which is
+// what electron-updater actually needs.
+//
+// Any failure here is caught and logged as a warning rather than thrown —
+// a DMG that fails Apple's per-container notarization still ships with a
+// stapled .app inside, so users are covered by the primary notarization.
+// Failing the whole build over the belt-and-suspenders DMG staple would
+// also lose latest-mac.yml (electron-builder writes it AFTER this hook is
+// supposed to succeed), which would break auto-updates.
 
 const { execSync } = require('node:child_process');
+
+const KEYCHAIN_PROFILE = 'RoutineTracker';
+
+function run(cmd) {
+  console.log('  $ ' + cmd);
+  execSync(cmd, { stdio: 'inherit' });
+}
 
 exports.default = async function afterAllArtifactBuild(context) {
   const dmgs = (context.artifactPaths || []).filter((p) => p.endsWith('.dmg'));
   for (const dmg of dmgs) {
-    console.log(`\n→ Stapling ${dmg}`);
-    execSync(`xcrun stapler staple "${dmg}"`, { stdio: 'inherit' });
-    console.log(`✓ ${dmg} stapled`);
+    try {
+      console.log(`\n→ Notarizing ${dmg} (container-level, ~2 min)`);
+      run(`xcrun notarytool submit "${dmg}" --keychain-profile "${KEYCHAIN_PROFILE}" --wait`);
+      console.log(`→ Stapling ${dmg}`);
+      run(`xcrun stapler staple "${dmg}"`);
+      console.log(`✓ ${dmg} notarized and stapled`);
+    } catch (err) {
+      console.warn(`⚠ DMG container-level notarization/staple failed for ${dmg}:`);
+      console.warn(`  ${err.message || err}`);
+      console.warn(`  (The .app inside is still stapled — install still works.)`);
+    }
   }
-  // Return an empty array — no additional artifacts to register.
   return [];
 };
