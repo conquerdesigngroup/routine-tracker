@@ -1,6 +1,6 @@
 {
-  "version": "1.4.0",
-  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.4.0/Routine-Tracker-1.4.0-universal.dmg",
-  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.4.0/Routine-Tracker-1.4.0-universal.dmg",
-  "releaseNotes": "Silent auto-updates. New versions download in the background and prompt you to restart when they're ready — no more manual re-downloads. Also: single universal DMG that runs natively on both Apple Silicon and Intel."
+  "version": "1.4.1",
+  "downloadUrl": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.4.1/Routine-Tracker-1.4.1-universal.dmg",
+  "downloadUrlX64": "https://github.com/conquerdesigngroup/routine-tracker/releases/download/v1.4.1/Routine-Tracker-1.4.1-universal.dmg",
+  "releaseNotes": "Fully offline-verifiable notarization. The .app bundle inside the DMG (and inside the auto-update ZIP) now carries a stapled Apple notarization ticket, so Gatekeeper never has to phone home — cleaner first launch, cleaner auto-update install."
 }
